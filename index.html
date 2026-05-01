@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WRB - Цифровой банк</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', sans-serif; }
+        body { background: #0a0202; color: #fff; }
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; min-height: 100vh; background: #140404; }
+        .logo { font-size: 48px; font-weight: 800; text-align: center; color: #e53935; margin-bottom: 20px; }
+        .card { background: #2b0a0a; border-radius: 20px; padding: 16px; margin-bottom: 12px; border: 1px solid #4a1515; cursor: pointer; }
+        .card-number { font-family: monospace; font-size: 16px; letter-spacing: 1px; }
+        .btn { background: #8b0000; padding: 12px; border-radius: 14px; text-align: center; font-weight: bold; cursor: pointer; margin-top: 10px; border: none; width: 100%; color: white; }
+        .btn-small { background: #5c0000; padding: 8px 12px; border-radius: 30px; font-size: 12px; display: inline-block; margin: 5px; cursor: pointer; }
+        input, select { background: #2a0f0f; border: 1px solid #4a1515; padding: 12px; border-radius: 14px; color: white; width: 100%; margin-bottom: 12px; }
+        .rank-VL { background: #9c27b0; }
+        .rank-GA { background: #ff9800; }
+        .rank-SM { background: #2196f3; }
+        .rank-PL { background: #f44336; }
+        .rank-badge { display: inline-block; padding: 2px 10px; border-radius: 30px; font-size: 11px; margin-left: 8px; }
+        .history-income { color: #4caf50; }
+        .history-outcome { color: #f44336; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: #2b0a0a; border-radius: 24px; padding: 24px; width: 90%; max-width: 380px; }
+        .hidden { display: none; }
+        .user-greeting { font-weight: bold; cursor: pointer; background: #2b0a0a; padding: 10px 15px; border-radius: 40px; display: inline-block; }
+        .balance-summary { background: #2b0a0a; border-radius: 20px; padding: 15px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+    // ========== КОНФИГ ==========
+    const API_URL = 'https://functions.yandexcloud.net/d4esogeg7bf1oq3894aa';
+    const YA_CLIENT_ID = '7d6b8ea615b6426fa72ecb9885b457eb';
+    
+    let currentUser = null;
+    
+    async function apiCall(method, data) {
+        try {
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ method, ...data })
+            });
+            return await res.json();
+        } catch(e) {
+            console.error('API Error:', e);
+            return { error: 'Сервер временно недоступен' };
+        }
+    }
+    
+    function formatCardNumber(num) {
+        return num.slice(0,4) + ' **** ' + num.slice(-4);
+    }
+    
+    function render() {
+        if (!currentUser) renderAuth();
+        else renderMain();
+    }
+    
+    function renderAuth() {
+        document.getElementById('app').innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px;">
+                <div style="background:#2b0a0a; border-radius:28px; padding:35px 25px; max-width:360px; width:100%;">
+                    <div class="logo">WRB</div>
+                    <div id="authForm">
+                        <input type="text" id="loginName" placeholder="Имя пользователя">
+                        <input type="password" id="loginPass" placeholder="Пароль">
+                        <button class="btn" id="loginBtn">Войти</button>
+                        <button class="btn" id="yaLoginBtn" style="background:#000; margin-top:10px;">🚀 Вход через Яндекс</button>
+                        <div style="text-align:center; margin-top:15px; color:#b87a7a; cursor:pointer;" id="showRegister">Нет аккаунта? Регистрация</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('loginBtn')?.addEventListener('click', async () => {
+            const username = document.getElementById('loginName').value;
+            const password = document.getElementById('loginPass').value;
+            const res = await apiCall('login', { username, password });
+            if (res.error) alert(res.error);
+            else { currentUser = res; render(); }
+        });
+        
+        document.getElementById('showRegister')?.addEventListener('click', () => {
+            document.getElementById('authForm').innerHTML = `
+                <input type="text" id="regName" placeholder="Имя пользователя">
+                <input type="password" id="regPass" placeholder="Пароль">
+                <button class="btn" id="registerBtn">Зарегистрироваться</button>
+                <div style="text-align:center; margin-top:15px; color:#b87a7a; cursor:pointer;" id="showLogin">Уже есть аккаунт? Войти</div>
+            `;
+            document.getElementById('registerBtn')?.addEventListener('click', async () => {
+                const username = document.getElementById('regName').value;
+                const password = document.getElementById('regPass').value;
+                const res = await apiCall('register', { username, password });
+                if (res.error) alert(res.error);
+                else { currentUser = res; render(); }
+            });
+            document.getElementById('showLogin')?.addEventListener('click', renderAuth);
+        });
+        
+        document.getElementById('yaLoginBtn')?.addEventListener('click', () => {
+            window.location.href = `https://oauth.yandex.ru/authorize?response_type=token&client_id=${YA_CLIENT_ID}&redirect_uri=${window.location.origin}`;
+        });
+    }
+    
+    async function renderMain() {
+        const userData = await apiCall('getUserData', { userId: currentUser.id });
+        if (userData && !userData.error) currentUser = { ...currentUser, ...userData };
+        
+        const totalBalance = (currentUser.balance || 0) + (currentUser.cards || []).reduce((sum,c)=>sum + (c.balance||0),0);
+        
+        document.getElementById('app').innerHTML = `
+            <div class="container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="user-greeting" id="profileBtn">${currentUser.username} <span class="rank-badge rank-${currentUser.rank}">${currentUser.rank}</span></div>
+                    <button class="btn-small" id="newCardBtn">+ Карта WR</button>
+                </div>
+                <div class="balance-summary">💰 Общий баланс: <strong>${totalBalance.toFixed(2)} Y</strong></div>
+                <div id="cardsList"></div>
+                <div style="margin-top:20px;">
+                    <button class="btn" id="transferBtn">💸 Перевод</button>
+                </div>
+                <div class="balance-summary" style="margin-top:20px;">
+                    <h4>📜 История</h4>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        `;
+        
+        // Карты
+        const cardsDiv = document.getElementById('cardsList');
+        if (!currentUser.cards || currentUser.cards.length === 0) {
+            cardsDiv.innerHTML = '<div style="text-align:center; color:#b87a7a;">Нет карт. Нажмите + Карта WR</div>';
+        } else {
+            cardsDiv.innerHTML = currentUser.cards.map((card, idx) => `
+                <div class="card" data-idx="${idx}">
+                    <div class="card-number">${formatCardNumber(card.card_number)}</div>
+                    <div>${card.balance.toFixed(2)} Y</div>
+                    <div class="hidden" id="details-${idx}">
+                        <div>Номер: ${card.card_number}</div>
+                        <div>Срок: ${card.expiry} | CVV: ${card.cvv}</div>
+                        <div>ПИН: ${card.pin ? '✔ установлен' : '❌ не установлен'}</div>
+                        <div class="flex">
+                            <div class="btn-small" data-show="${idx}">Показать данные</div>
+                            <div class="btn-small" data-design="${idx}">Сменить дизайн</div>
+                            <div class="btn-small" data-close="${idx}">Закрыть карту</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            currentUser.cards.forEach((_, idx) => {
+                document.querySelector(`.card[data-idx="${idx}"]`)?.addEventListener('click', (e) => {
+                    if(e.target.classList.contains('btn-small')) return;
+                    const details = document.getElementById(`details-${idx}`);
+                    details.classList.toggle('hidden');
+                });
+                
+                document.querySelector(`[data-show="${idx}"]`)?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const card = currentUser.cards[idx];
+                    alert(`Карта: ${card.card_number}\nСрок: ${card.expiry}\nCVV: ${card.cvv}\nПИН: ${card.pin || 'не задан'}`);
+                });
+                
+                document.querySelector(`[data-design="${idx}"]`)?.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const newDesign = prompt('Введите цвет (Темно-красный, Темно-зеленый, Темно-оранжевый, Черный):');
+                    if(newDesign) {
+                        await apiCall('setDesign', { cardId: currentUser.cards[idx].id, design: newDesign });
+                        render();
+                    }
+                });
+                
+                document.querySelector(`[data-close="${idx}"]`)?.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const card = currentUser.cards[idx];
+                    if(card.balance > 0) {
+                        const otherCard = currentUser.cards.find((c,i)=> i!==idx && c.pin);
+                        if(!otherCard) { alert("Нужна другая карта с ПИН-кодом"); return; }
+                        const pin = prompt(`Введите ПИН карты *${card.card_number.slice(-4)}:`);
+                        if(pin !== card.pin) { alert("Неверный ПИН"); return; }
+                        await apiCall('closeCard', { cardId: card.id, userId: currentUser.id, targetCardId: otherCard.id });
+                    } else {
+                        await apiCall('closeCard', { cardId: card.id, userId: currentUser.id });
+                    }
+                    render();
+                });
+            });
+        }
+        
+        // История
+        const history = await apiCall('getHistory', { userId: currentUser.id });
+        const historyDiv = document.getElementById('historyList');
+        if(!history || history.length === 0) historyDiv.innerHTML = '<div>Пусто</div>';
+        else {
+            historyDiv.innerHTML = history.map(h => `
+                <div style="padding:8px 0; border-bottom:1px solid #4a1515;" class="${h.type === 'income' ? 'history-income' : 'history-outcome'}">
+                    ${h.type === 'income' ? '⬇️ +' : '⬆️ -'} ${h.amount.toFixed(2)} Y — ${h.counterparty_name}
+                    <div style="font-size:11px; color:#b87a7a;">${h.created_at} ${h.description ? ' | '+h.description : ''}</div>
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('newCardBtn').addEventListener('click', async () => {
+            const type = prompt('Тип карты: Мир, Мастеркард, Виза, Юнион Пей');
+            if(type) {
+                const res = await apiCall('createCard', { userId: currentUser.id, cardType: type });
+                if(res.cardId) {
+                    const pin = prompt('Установите ПИН-код (4 цифры):');
+                    if(pin && /^\d{4}$/.test(pin)) {
+                        await apiCall('setPin', { cardId: res.cardId, pin });
+                    }
+                    render();
+                }
+            }
+        });
+        
+        document.getElementById('transferBtn').addEventListener('click', async () => {
+            const cardsWithPin = (currentUser.cards || []).filter(c => c.pin);
+            if(cardsWithPin.length === 0) { alert("Нет карт с ПИН-кодом"); return; }
+            
+            const users = await apiCall('getAllUsers', { userId: currentUser.id, rank: currentUser.rank });
+            
+            const fromCard = await new Promise(resolve => {
+                const select = prompt(`Выберите карту:\n${cardsWithPin.map((c,i)=>`${i+1}: *${c.card_number.slice(-4)} (${c.balance} Y)`).join('\n')}\nВведите номер:`);
+                resolve(cardsWithPin[parseInt(select)-1]);
+            });
+            if(!fromCard) return;
+            
+            const amount = parseFloat(prompt('Сумма (0.10 - 20 000 000 Y):'));
+            if(isNaN(amount) || amount<0.10 || amount>20000000) { alert("Неверная сумма"); return; }
+            
+            const isSelfTransfer = confirm('Перевести себе на другую карту? (ОК — себе, Отмена — другому пользователю)');
+            let toUser = null, toCard = null;
+            
+            if(isSelfTransfer) {
+                const otherCard = cardsWithPin.find(c => c.id !== fromCard.id);
+                if(!otherCard) { alert("Нет другой карты"); return; }
+                toCard = otherCard;
+            } else {
+                const userList = users.map(u => `${u.username} (${u.rank})`).join('\n');
+                const targetName = prompt(`Выберите получателя:\n${userList}\nВведите имя:`);
+                toUser = users.find(u => u.username === targetName);
+                if(!toUser) { alert("Пользователь не найден"); return; }
+            }
+            
+            const pin = prompt(`Введите ПИН карты *${fromCard.card_number.slice(-4)}:`);
+            if(pin !== fromCard.pin) { alert("Неверный ПИН"); return; }
+            
+            const description = prompt('Назначение перевода (опционально):', '') || '';
+            
+            const res = await apiCall('transfer', {
+                fromCardId: fromCard.id,
+                fromUserId: currentUser.id,
+                toUserId: toUser?.id,
+                toCardId: toCard?.id,
+                amount,
+                description
+            });
+            
+            if(res.error) alert(res.error);
+            else { alert("Перевод выполнен"); render(); }
+        });
+        
+        document.getElementById('profileBtn').addEventListener('click', async () => {
+            const action = confirm(`Профиль: ${currentUser.username}\nСоздан через: ${currentUser.created_via || 'сайт'}\n\nНажмите ОК для удаления профиля (баланс обнулится при повторной регистрации), Отмена — закрыть`);
+            if(action) {
+                await apiCall('deleteProfile', { userId: currentUser.id });
+                currentUser = null;
+                render();
+            }
+        });
+    }
+    
+    // Проверка токена Яндекс OAuth при загрузке
+    const hash = window.location.hash;
+    if(hash.includes('access_token')) {
+        const token = hash.split('access_token=')[1]?.split('&')[0];
+        if(token) {
+            fetch('https://login.yandex.ru/info', { headers: { 'Authorization': `OAuth ${token}` } })
+                .then(r => r.json())
+                .then(async data => {
+                    const res = await apiCall('yandexLogin', { yandexId: data.id, username: data.display_name });
+                    if(res.error) alert(res.error);
+                    else { currentUser = res; window.location.hash = ''; render(); }
+                });
+        }
+    }
+    
+    render();
+</script>
+</body>
+</html>
